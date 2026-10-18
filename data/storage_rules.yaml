@@ -1,0 +1,26 @@
+# Curated food-storage rules. The assistant may paraphrase these but has no
+# way to invent new ones. Each rule must carry its source.
+#
+# applies_to can hold any of: ids, categories, locations, or all: true.
+# TODO: verify each rule against its source page, cite the exact URL,
+# and grow this list to ~30 rules.
+rules:
+  - applies_to: {all: true}
+    text: Keep the fridge at 4 °C (40 °F) or below.
+    source: USDA FSIS, refrigeration and food safety (cite exact page)
+
+  - applies_to: {locations: [freezer]}
+    text: Food kept constantly at -18 °C (0 °F) stays safe, but its quality drops over time.
+    source: USDA FSIS, freezing and food safety (cite exact page)
+
+  - applies_to: {categories: [meat, seafood]}
+    text: Store raw meat, poultry and fish on the bottom shelf in a sealed container so juices cannot drip onto other food.
+    source: USDA FSIS (cite exact page)
+
+  - applies_to: {ids: [milk, cream, yogurt]}
+    text: Keep dairy on a main shelf, not in the door; the door is the warmest part of the fridge.
+    source: USDA FSIS (cite exact page)
+
+  - applies_to: {ids: [egg]}
+    text: Keep eggs in their original carton on a main shelf, not in the door.
+    source: USDA FSIS (cite exact page)

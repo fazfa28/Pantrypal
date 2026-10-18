@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Secrets
+.env
+.streamlit/secrets.toml
+
+# Local data (download per data/README.md; never commit raw datasets)
+data/pantry.db
+data/raw/
+data/recipes_5k.parquet
+data/*.npy
+eval/cache/*
+!eval/cache/.gitkeep
+eval/results/*
+!eval/results/.gitkeep
+eval/manifests/*.csv
+!eval/manifests/fridge_template.csv
+
+# OS
+.DS_Store
+Thumbs.db

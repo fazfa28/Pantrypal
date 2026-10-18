@@ -1,0 +1,17 @@
+# Acceptable substitutes: if a recipe needs <key> and one of the listed ids
+# is in stock, the ingredient counts as half-covered (m(r) = 0.5).
+# All ids must exist in aliases.yaml. Grow this list as you test.
+spring_onion: [onion, shallot]
+shallot: [onion]
+onion: [shallot]
+lemon: [lime]
+lime: [lemon]
+butter: [margarine]
+margarine: [butter]
+milk: [soy_milk]
+cream: [milk]
+pasta: [noodle]
+noodle: [pasta]
+fish: [salmon, tuna]
+bacon: [ham]
+tomato_sauce: [tomato]

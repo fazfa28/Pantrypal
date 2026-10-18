@@ -1,0 +1,28 @@
+# Freiburg Groceries folder name -> canonical id.
+# Labels not listed here fall back to the canonicalizer.
+BEANS: beans
+CAKE: cake
+CANDY: candy
+CEREAL: cereal
+CHIPS: chips
+CHOCOLATE: chocolate
+COFFEE: coffee
+CORN: corn
+FISH: tuna            # the paper calls this class "tuna"; check the folder name
+TUNA: tuna
+FLOUR: flour
+HONEY: honey
+JAM: jam
+JUICE: juice
+MILK: milk
+NUTS: nuts
+OIL: oil
+PASTA: pasta
+RICE: rice
+SODA: soda
+SPICES: spices
+SUGAR: sugar
+TEA: tea
+TOMATO_SAUCE: tomato_sauce
+VINEGAR: vinegar
+WATER: water

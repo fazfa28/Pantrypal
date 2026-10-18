@@ -1,0 +1,21 @@
+# Days an item keeps from when it first appears in a scan, per location.
+# Used only when no printed expiry date is readable.
+#
+# PLACEHOLDER VALUES: these few rows exist so the app runs end to end.
+# Regenerate the real table from USDA FoodKeeper with:
+#   python -m scripts.build_shelf_life data/raw/foodkeeper.json
+# and keep the minimum of each FoodKeeper range (the conservative end).
+milk:         {fridge: 7}
+egg:          {fridge: 21}
+butter:       {fridge: 30, freezer: 180}
+cheese:       {fridge: 21}
+yogurt:       {fridge: 7}
+chicken:      {fridge: 1, freezer: 270}
+beef:         {fridge: 1, freezer: 90}
+fish:         {fridge: 1, freezer: 90}
+spinach:      {fridge: 3}
+lettuce:      {fridge: 3}
+tomato:       {fridge: 5, pantry: 3}
+bread:        {pantry: 3, freezer: 90}
+rice:         {pantry: 365}
+pasta:        {pantry: 365}

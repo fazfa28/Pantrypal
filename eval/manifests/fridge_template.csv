@@ -1,0 +1,2 @@
+id,photos,labels,split
+scene01,data/raw/fridge/scene01_1.jpg;data/raw/fridge/scene01_2.jpg;data/raw/fridge/scene01_3.jpg,milk:1;egg:6;spring_onion:1;chicken:2;yogurt:4,test

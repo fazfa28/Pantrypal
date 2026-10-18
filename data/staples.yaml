@@ -1,0 +1,8 @@
+# Ingredients assumed to be in every kitchen. They are ignored when
+# scoring recipes and never appear on a shopping list. Users can edit this.
+staples:
+  - salt
+  - black_pepper
+  - oil
+  - water
+  - sugar

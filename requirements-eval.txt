@@ -1,0 +1,5 @@
+# Extra packages for development and the evaluation scripts.
+# Kept out of requirements.txt so the hosted app stays small.
+-r requirements.txt
+pytest>=8
+sentence-transformers>=3.0     # optional embedding fallback in core/canon.py

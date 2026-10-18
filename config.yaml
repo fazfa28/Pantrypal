@@ -1,0 +1,78 @@
+# PantryPal configuration. Every model id and tunable lives here,
+# so swapping a model is a one-line change.
+
+llm:
+  base_url: https://openrouter.ai/api/v1
+  api_key_env: OPENROUTER_API_KEY          # read from env or .streamlit/secrets.toml
+  vision_model: qwen/qwen3-vl-8b-instruct
+  chat_model: qwen/qwen3-vl-8b-instruct    # any cheap model that supports tool calling
+  temperature: 0
+  max_image_px: 1024                       # long side; the main cost lever
+  max_tool_calls: 4                        # per assistant turn
+
+# Models compared in Experiment 1. price = US$ per 1M tokens [input, output].
+# Checked on OpenRouter 12 Oct 2026; re-check before the full run.
+eval_models:
+  qwen3-vl-8b:
+    id: qwen/qwen3-vl-8b-instruct
+    price: [0.25, 0.75]
+  llama4-scout:
+    id: meta-llama/llama-4-scout
+    price: [0.10, 0.30]
+  nemotron-3.5:
+    id: nvidia/nemotron-3.5-super-vl              
+    price: [0.10, 0.40]
+  glm-5.3-flash:
+    id: z-ai/glm-5.3-flash
+    price: [0.048, 0.20]
+  qwen3-vl-235b:
+    id: qwen/qwen3-vl-235b-a22b-instruct
+    price: [0.20, 0.88]
+  gemma-4-26b:
+    id: google/gemma-4-26b-a4b-it
+    price: [0.042, 0.22]
+  gemini-3.7-flash:
+    id: google/gemini-3.7-flash
+    price: [0.75, 3.75]
+  # Fallback if Molmo has no endpoint:
+  # qwen3.8-27b:
+  #   id: qwen/qwen3.8-27b
+  #   price: [0.04, 1.35]
+  # Optional commercial reference (different base_url and key):
+  # gemini-flash-lite:
+  #   id: gemini-2.5-flash-lite
+  #   base_url: https://generativelanguage.googleapis.com/v1beta/openai/
+  #   api_key_env: GEMINI_API_KEY
+  #   price: [0.10, 0.40]
+
+paths:                                     # relative to the repo root
+  db: data/pantry.db
+  aliases: data/aliases.yaml
+  staples: data/staples.yaml
+  substitutes: data/substitutes.yaml
+  shelf_life: data/shelf_life.yaml
+  storage_rules: data/storage_rules.yaml
+  label_maps: data/label_maps
+  recipes: data/recipes_5k.parquet
+  cache: eval/cache
+  results: eval/results
+
+canon:
+  fuzzy_min: 90                            # rapidfuzz token_set_ratio, 0-100
+  use_embeddings: false                    # true needs requirements-eval.txt
+  embedding_model: all-MiniLM-L6-v2
+  embedding_min: 0.80
+
+recipes:
+  alpha: 0.3                               # weight of expiry urgency
+  beta: 0.05                               # penalty per missing ingredient
+  max_ingredients: 12
+  max_minutes: 60
+  min_reviews: 1
+  limit: 5000
+
+rules:
+  use_soon_days: 2                         # urgency 1.0
+  soon_days: 5                             # urgency 0.5
+  # TODO: set these from a guideline you cite in the paper.
+  calorie_floor: {female: 1200, male: 1500}

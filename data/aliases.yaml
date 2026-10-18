@@ -1,0 +1,82 @@
+# Canonical food list. Every module keys on these ids.
+# Format:  <canonical_id>: {category: <cat>, aliases: [other names]}
+# The id itself (underscores -> spaces) is always an alias; plurals are handled in code.
+# Start: Freiburg's 25 classes + common fridge items. Grow this to cover
+# FoodKeeper items and the Grocery Store coarse classes.
+#
+# Categories: dairy, egg, meat, seafood, produce, fruit, grain, bakery,
+#             condiment, snack, beverage, baking, plant_protein, other
+
+# --- Freiburg Groceries classes ---
+beans:         {category: plant_protein, aliases: [canned beans, kidney beans, black beans, baked beans]}
+cake:          {category: bakery, aliases: [sponge cake, cupcake]}
+candy:         {category: snack, aliases: [sweets, gummy bears, lollipop]}
+cereal:        {category: grain, aliases: [cornflakes, muesli, granola, breakfast cereal]}
+chips:         {category: snack, aliases: [crisps, potato chips, tortilla chips]}
+chocolate:     {category: snack, aliases: [chocolate bar, dark chocolate]}
+coffee:        {category: beverage, aliases: [ground coffee, coffee beans, instant coffee]}
+corn:          {category: produce, aliases: [sweetcorn, canned corn, corn kernels, maize]}
+flour:         {category: baking, aliases: [plain flour, all purpose flour, wheat flour]}
+honey:         {category: condiment, aliases: []}
+jam:           {category: condiment, aliases: [jelly, preserves, marmalade]}
+juice:         {category: beverage, aliases: [orange juice, apple juice, fruit juice]}
+milk:          {category: dairy, aliases: [whole milk, skim milk, fresh milk, low fat milk]}
+nuts:          {category: snack, aliases: [almonds, cashews, walnuts, peanuts, mixed nuts]}
+oil:           {category: condiment, aliases: [olive oil, vegetable oil, cooking oil, canola oil, sesame oil]}
+pasta:         {category: grain, aliases: [spaghetti, penne, macaroni, fusilli]}
+rice:          {category: grain, aliases: [white rice, jasmine rice, basmati rice, brown rice]}
+soda:          {category: beverage, aliases: [soft drink, cola, coke, fizzy drink]}
+spices:        {category: condiment, aliases: [spice, paprika, cumin, curry powder, chili powder]}
+sugar:         {category: baking, aliases: [white sugar, brown sugar, caster sugar]}
+tea:           {category: beverage, aliases: [tea bags, green tea, black tea]}
+tomato_sauce:  {category: condiment, aliases: [pasta sauce, marinara, passata, tomato puree, ketchup]}
+tuna:          {category: seafood, aliases: [canned tuna, tuna chunks]}
+vinegar:       {category: condiment, aliases: [white vinegar, apple cider vinegar, balsamic vinegar]}
+water:         {category: beverage, aliases: [mineral water, bottled water]}
+
+# --- Common fridge and pantry items ---
+egg:           {category: egg, aliases: [eggs, chicken egg]}
+butter:        {category: dairy, aliases: [unsalted butter, salted butter]}
+margarine:     {category: dairy, aliases: []}
+cheese:        {category: dairy, aliases: [cheddar, mozzarella, parmesan, cheese slices]}
+yogurt:        {category: dairy, aliases: [yoghurt, greek yogurt]}
+cream:         {category: dairy, aliases: [heavy cream, whipping cream, cooking cream]}
+soy_milk:      {category: beverage, aliases: [soya milk, oat milk, almond milk]}
+chicken:       {category: meat, aliases: [chicken breast, chicken thigh, chicken wings, boneless chicken]}
+beef:          {category: meat, aliases: [ground beef, minced beef, beef steak, steak]}
+pork:          {category: meat, aliases: [pork chop, pork belly, minced pork, ground pork]}
+bacon:         {category: meat, aliases: []}
+ham:           {category: meat, aliases: [sliced ham]}
+sausage:       {category: meat, aliases: [sausages, hot dog, frankfurter]}
+salmon:        {category: seafood, aliases: [salmon fillet]}
+fish:          {category: seafood, aliases: [white fish, fish fillet, cod, tilapia]}
+shrimp:        {category: seafood, aliases: [prawn, prawns]}
+tofu:          {category: plant_protein, aliases: [bean curd, firm tofu, silken tofu]}
+onion:         {category: produce, aliases: [yellow onion, red onion, white onion]}
+shallot:       {category: produce, aliases: []}
+spring_onion:  {category: produce, aliases: [scallion, green onion]}
+garlic:        {category: produce, aliases: [garlic clove, garlic cloves]}
+ginger:        {category: produce, aliases: [ginger root, fresh ginger]}
+tomato:        {category: produce, aliases: [cherry tomato, roma tomato]}
+potato:        {category: produce, aliases: [russet potato, baby potato]}
+carrot:        {category: produce, aliases: []}
+spinach:       {category: produce, aliases: [baby spinach]}
+lettuce:       {category: produce, aliases: [romaine, iceberg lettuce, salad leaves]}
+cabbage:       {category: produce, aliases: [napa cabbage, chinese cabbage]}
+broccoli:      {category: produce, aliases: []}
+bell_pepper:   {category: produce, aliases: [capsicum, red pepper, green pepper]}
+chili:         {category: produce, aliases: [chilli, chili pepper, red chili]}
+cucumber:      {category: produce, aliases: []}
+mushroom:      {category: produce, aliases: [button mushroom, shiitake]}
+eggplant:      {category: produce, aliases: [aubergine, brinjal]}
+apple:         {category: fruit, aliases: [green apple, red apple]}
+banana:        {category: fruit, aliases: []}
+orange:        {category: fruit, aliases: [mandarin, tangerine]}
+lemon:         {category: fruit, aliases: []}
+lime:          {category: fruit, aliases: [calamansi]}
+bread:         {category: bakery, aliases: [white bread, wholemeal bread, sliced bread, loaf]}
+noodle:        {category: grain, aliases: [noodles, egg noodles, rice noodles, instant noodles, ramen]}
+peanut_butter: {category: condiment, aliases: []}
+soy_sauce:     {category: condiment, aliases: [light soy sauce, dark soy sauce, shoyu]}
+salt:          {category: condiment, aliases: [sea salt, table salt, kosher salt]}
+black_pepper:  {category: condiment, aliases: [pepper, ground pepper, peppercorns]}

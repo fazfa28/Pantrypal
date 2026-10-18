@@ -1,0 +1,15 @@
+{
+  "n": 20,
+  "valid_json_rate": 1.0,
+  "cost_usd_total": 0.0025,
+  "cost_usd_per_image": 0.000126,
+  "tokens_per_image": 396.55,
+  "median_latency_s": 2.8425000000000002,
+  "top1_accuracy": 0.4,
+  "top1_accuracy_ci95": [
+    0.2,
+    0.6
+  ],
+  "macro_f1": 0.6210826210826211,
+  "hit_rate": 0.4
+}
