@@ -123,12 +123,3 @@ Set a credit limit on the OpenRouter key before bulk runs.
 | Rules lead | `core/rules.py`, `data/storage_rules.yaml`, `scripts/build_shelf_life.py` |
 | Data and study lead | `data/aliases.yaml`, label maps, fridge manifest, user study |
 
-## Before the real runs (TODOs in the code)
-
-- [ ] Regenerate `data/shelf_life.yaml` from FoodKeeper (current rows are placeholders).
-- [ ] Verify and cite each rule in `data/storage_rules.yaml`; grow it to about 30.
-- [ ] Cite a guideline for `rules.calorie_floor` and `GOAL_ADJUSTMENT`.
-- [ ] Confirm Molmo 2 8B has a live endpoint; re-check prices in `config.yaml`.
-- [ ] Grow `data/aliases.yaml` until `core.recipes build` reports few unmatched ingredients.
-- [ ] Check the Freiburg folder names against `data/label_maps/freiburg.yaml`.
-- [ ] `log_cooked` removes one unit per ingredient; ask users for real quantities.
