@@ -1,7 +1,13 @@
 """Map any free-text food name to a canonical food id (see data/aliases.yaml).
 
 Every module keys on these ids: shelf life, storage rules, recipe matching and
-evaluation. Matching order: exact alias -> fuzzy (rapidfuzz) -> embeddings (optional).
+evaluation. Matching order: exact alias -> strict fuzzy (rapidfuzz) -> embeddings (optional).
+
+Aliases come from data/aliases.yaml (hand-edited, wins on conflict) and
+data/aliases_extra.yaml (generated offline by scripts/build_ingredient_map.py).
+The fuzzy step only catches typos and spacing: extra words lower the score, so
+"fish sauce" does NOT match "fish". Anything without a confident match gets no id
+and is flagged for review instead of guessed.
 """
 from __future__ import annotations
 
@@ -45,16 +51,26 @@ class Match:
 
 
 class Canonicalizer:
-    def __init__(self, aliases_file: str | Path | None = None, use_embeddings: bool | None = None):
-        with open(aliases_file or path("aliases"), encoding="utf-8") as f:
-            data = yaml.safe_load(f) or {}
+    def __init__(
+        self,
+        aliases_file: str | Path | None = None,
+        use_embeddings: bool | None = None,
+        extra_file: str | Path | None = None,
+    ):
+        files = [aliases_file or path("aliases")]
+        extra = extra_file or (None if aliases_file else path("aliases_extra"))
+        if extra and Path(extra).exists():
+            files.append(extra)
         self.category: dict[str, str] = {}
         self._alias_to_id: dict[str, str] = {}
-        for cid, info in data.items():
-            info = info or {}
-            self.category[cid] = info.get("category", "other")
-            for alias in [cid.replace("_", " "), *info.get("aliases", [])]:
-                self._alias_to_id.setdefault(normalize(alias), cid)
+        for file in files:   # earlier files win on conflict
+            with open(file, encoding="utf-8") as f:
+                data = yaml.safe_load(f) or {}
+            for cid, info in data.items():
+                info = info or {}
+                self.category.setdefault(cid, info.get("category", "other"))
+                for alias in [cid.replace("_", " "), *info.get("aliases", [])]:
+                    self._alias_to_id.setdefault(normalize(alias), cid)
         self._aliases = list(self._alias_to_id)
         self.fuzzy_min = cfg("canon", "fuzzy_min", default=90)
         self.embedding_min = cfg("canon", "embedding_min", default=0.80)
@@ -82,7 +98,7 @@ class Canonicalizer:
             return Match(self._alias_to_id[q], 1.0, "exact")
         best, best_score = None, 0.0
         for alias in self._aliases:
-            s = fuzz.token_set_ratio(q, alias)
+            s = fuzz.ratio(q, alias)   # whole-string similarity: extra words lower the score
             # On ties prefer the longer alias ("tomato sauce" over "tomato").
             if s > best_score or (s == best_score and best and len(alias) > len(best)):
                 best, best_score = alias, s

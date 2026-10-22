@@ -26,7 +26,7 @@ oil:           {category: condiment, aliases: [olive oil, vegetable oil, cooking
 pasta:         {category: grain, aliases: [spaghetti, penne, macaroni, fusilli]}
 rice:          {category: grain, aliases: [white rice, jasmine rice, basmati rice, brown rice]}
 soda:          {category: beverage, aliases: [soft drink, cola, coke, fizzy drink]}
-spices:        {category: condiment, aliases: [spice, paprika, cumin, curry powder, chili powder]}
+spices:        {category: condiment, aliases: [spice]}
 sugar:         {category: baking, aliases: [white sugar, brown sugar, caster sugar]}
 tea:           {category: beverage, aliases: [tea bags, green tea, black tea]}
 tomato_sauce:  {category: condiment, aliases: [pasta sauce, marinara, passata, tomato puree, ketchup]}

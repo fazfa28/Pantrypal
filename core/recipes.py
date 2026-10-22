@@ -26,13 +26,41 @@ from core.config import cfg, load_yaml, path
 REQUIRED = ["RecipeId", "Name", "TotalTime", "RecipeIngredientParts", "RecipeServings", "Calories", "ReviewCount"]
 
 _R_STRING = re.compile(r'"((?:[^"\\]|\\.)*)"')
+_R_ITEM = re.compile(r'"(?:[^"\\]|\\.)*"|\bNA\b')   # quoted strings and bare NA, for counting R vectors
 _ISO_DURATION = re.compile(r"^PT(?:(\d+)H)?(?:(\d+)M)?")
 
 NON_VEGETARIAN = {"meat", "seafood"}
 NON_VEGAN = NON_VEGETARIAN | {"dairy", "egg"}
 MEAT_WORDS = ("chicken", "beef", "pork", "bacon", "ham", "lamb", "mutton", "sausage", "turkey", "fish",
-              "shrimp", "prawn", "salmon", "tuna", "anchov", "crab", "gelatin", "lard")
+              "shrimp", "prawn", "salmon", "tuna", "anchov", "crab", "gelatin", "lard", "veal", "steak",
+              "venison", "duck", "meat", "lobster", "tilapia", "cod", "scallop", "clam", "mussel", "chorizo",
+              "pepperoni", "prosciutto", "salami", "oyster")
 ANIMAL_WORDS = MEAT_WORDS + ("milk", "cheese", "butter", "cream", "yogurt", "egg", "honey")
+
+
+# Meal type of a recipe, from Food.com's RecipeCategory plus a few name words (categories are noisy).
+DESSERT_CATS = {"Dessert", "Drop Cookies", "Bar Cookie", "Pie", "Cheesecake", "Candy", "Frozen Desserts",
+                "Tarts", "Gelatin", "Ice Cream", "Brownie", "Cookie & Brownie"}
+BREAKFAST_CATS = {"Breakfast", "Quick Breads", "Scones", "Smoothies", "Breakfast Eggs", "Oatmeal"}
+NOT_A_MAIN = {"Sauces", "Spreads", "Salad Dressings", "Beverages", "Shakes", "Punch Beverage", "Jellies",
+              "Chutneys", "Marinades", "Lemonade", "Breads", "Yeast Breads"} | DESSERT_CATS | BREAKFAST_CATS
+NOT_A_MAIN_WORDS = ("sauce", "dressing", "dip", "marinade", "seasoning", "rub", "spread", "smoothie", "drink",
+                    "buns", "bread", "cookie", "frosting", "glaze", "syrup", "vinaigrette", "mix", "batter",
+                    "relish", "oil", "jam", "jelly", "butter", "salsa", "chutney", "pesto", "gravy", "essence",
+                    "topper", "topping", "dog treat", "dog")
+
+
+def suits_meal(rec: dict, meal: str | None) -> bool:
+    """meal: 'dinner' | 'breakfast' | 'dessert' | None (no filter)."""
+    if not meal:
+        return True
+    cat = rec.get("category", "") or ""
+    if meal == "dessert":
+        return cat in DESSERT_CATS
+    if meal == "breakfast":
+        return cat in BREAKFAST_CATS
+    name = str(rec.get("name", "")).lower()
+    return cat not in NOT_A_MAIN and not any(re.search(rf"\b{w}s?\b", name) for w in NOT_A_MAIN_WORDS)
 
 
 # ---------- parsing helpers ----------
@@ -71,7 +99,8 @@ def _num(v, default=None):
 # ---------- build ----------
 
 
-def build_index(src: str | Path, out: str | Path | None = None, limit: int | None = None) -> pd.DataFrame:
+def build_index(src: str | Path, out: str | Path | None = None, limit: int | None = None,
+                use_staples: bool = True) -> pd.DataFrame:
     src = Path(src)
     df = pd.read_parquet(src) if src.suffix == ".parquet" else pd.read_csv(src)
     missing = [c for c in REQUIRED if c not in df.columns]
@@ -85,6 +114,11 @@ def build_index(src: str | Path, out: str | Path | None = None, limit: int | Non
     # Cheap vectorised filters first, most-reviewed recipes first.
     df["minutes"] = df["TotalTime"].map(iso_minutes)
     df["n_ingr"] = df["RecipeIngredientParts"].map(lambda v: len(parse_list(v)))
+    # Food.com quirk: some ingredient names are silently dropped (e.g. "Chicken Noodle Soup" without chicken).
+    # Such recipes have fewer names than quantities; drop them, since their ingredient list is incomplete.
+    if "RecipeIngredientQuantities" in df.columns:
+        n_qty = df["RecipeIngredientQuantities"].map(lambda v: len(_R_ITEM.findall(str(v))))
+        df = df[df["n_ingr"] >= n_qty]
     df["ReviewCount"] = pd.to_numeric(df["ReviewCount"], errors="coerce").fillna(0)
     df = df[
         df["minutes"].notna() & (df["minutes"] <= max_minutes)
@@ -92,18 +126,19 @@ def build_index(src: str | Path, out: str | Path | None = None, limit: int | Non
         & (df["ReviewCount"] >= cfg("recipes", "min_reviews", default=1))
     ].sort_values("ReviewCount", ascending=False)
 
-    canon, staples = get_canon(), rules.staples()
+    canon, staples = get_canon(), rules.staples(use_staples)
     rows = []
     for r in df.itertuples(index=False):
         names = parse_list(r.RecipeIngredientParts)
         ids = [canon.match(n).id or f"raw:{normalize(n)}" for n in names]
         core_ids = [i for i in dict.fromkeys(ids) if i not in staples]
-        if not core_ids:
+        if len(core_ids) < cfg("recipes", "min_core_ingredients", default=3):
             continue
         rows.append({
             "recipe_id": int(r.RecipeId),
             "name": str(r.Name),
             "minutes": int(r.minutes),
+            "category": str(getattr(r, "RecipeCategory", "") or "").replace("nan", ""),
             "servings": _num(r.RecipeServings, 1.0) or 1.0,
             "calories_per_serving": _num(r.Calories),
             "review_count": int(r.ReviewCount),
@@ -126,9 +161,9 @@ def build_index(src: str | Path, out: str | Path | None = None, limit: int | Non
     return index
 
 
-@lru_cache(maxsize=1)
-def load_index() -> pd.DataFrame:
-    p = path("recipes")
+@lru_cache(maxsize=4)
+def load_index(file: str | None = None) -> pd.DataFrame:
+    p = Path(file) if file else path("recipes")
     if not p.exists():
         raise FileNotFoundError(f"{p} not found. Run: python -m core.recipes build data/raw/recipes.parquet")
     df = pd.read_parquet(p)
@@ -170,6 +205,15 @@ def score_recipe(ingredient_ids: list[str], have: dict[str, int | None], alpha: 
     }
 
 
+def is_cookable(ingredient_ids, have, max_missing: int | None = None, min_matched: int | None = None) -> bool:
+    """One rule for every method in Experiment 2: few enough non-staple ids missing AND enough in stock,
+    so a recipe that is mostly staples does not count as cookable by default. No substitute credit."""
+    max_missing = cfg("recipes", "cookable_max_missing", default=1) if max_missing is None else max_missing
+    min_matched = cfg("recipes", "cookable_min_matched", default=3) if min_matched is None else min_matched
+    ids, have = set(ingredient_ids), set(have)
+    return len(ids - have) <= max_missing and len(ids & have) >= min_matched
+
+
 def jaccard_score(ingredient_ids: list[str], have: dict) -> dict:
     """Baseline for Experiment 2: plain set overlap, no substitutes, no expiry term."""
     r, i = set(ingredient_ids), set(have)
@@ -184,9 +228,10 @@ def violates_diet(recipe: dict, diet: str | None) -> bool:
     cats = get_canon().category
     if any(cats.get(i) in banned_cats for i in recipe["ingredient_ids"]):
         return True
-    # Word-start match on the raw ingredient text catches what canonicalisation missed.
-    # Known false positives to fix as you test: "peanut butter", "eggplant", "cream of tartar".
-    text = " ".join(recipe["ingredients"]).lower()
+    # Word-start match on the raw ingredient text AND the recipe name catches what canonicalisation missed
+    # (and ingredients the dataset dropped). Known false positives: "peanut butter", "eggplant",
+    # "cream of tartar", "hamburger buns".
+    text = (" ".join(recipe["ingredients"]) + " " + str(recipe.get("name", ""))).lower()
     return any(re.search(rf"\b{w}", text) for w in words)
 
 
@@ -199,11 +244,13 @@ def search(
     calorie_target: float | None = None,
     method: str = "pantrypal",
     df: pd.DataFrame | None = None,
+    alpha: float | None = None,
+    beta: float | None = None,
 ) -> list[dict]:
     """Rank recipes for an inventory. method: 'pantrypal' (match score) or 'jaccard' (baseline)."""
     df = load_index() if df is None else df
     exclude_ids = {get_canon().match(e).id or normalize(e) for e in (exclude or [])}
-    scorer = jaccard_score if method == "jaccard" else score_recipe
+    scorer = jaccard_score if method == "jaccard" else (lambda ids, h: score_recipe(ids, h, alpha, beta))
     results = []
     for rec in df.to_dict("records"):
         if max_minutes and rec["minutes"] > max_minutes:
@@ -231,9 +278,10 @@ def main():
     b.add_argument("src", help="data/raw/recipes.parquet (or .csv)")
     b.add_argument("--out", default=None)
     b.add_argument("--limit", type=int, default=None)
+    b.add_argument("--no-staples", action="store_true", help="keep salt, oil, etc. as real ingredients (ablation)")
     args = ap.parse_args()
     if args.cmd == "build":
-        build_index(args.src, args.out, args.limit)
+        build_index(args.src, args.out, args.limit, use_staples=not args.no_staples)
 
 
 if __name__ == "__main__":

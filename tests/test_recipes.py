@@ -57,3 +57,46 @@ def test_vegetarian_filter():
 def test_exclude():
     hits = rx.search({"egg": 1}, exclude=["soy sauce"], df=RECIPES)
     assert not any("soy_sauce" in h["ingredient_ids"] for h in hits)
+
+
+def test_cookable_is_the_same_rule_for_every_method():
+    from eval.run_retrieval import score_ranked
+    rec = {"ingredient_ids": ["milk", "cream", "egg", "rice", "onion"], "missing": [], "ingredients": [],
+           "substituted": {"milk": "soy_milk", "cream": "milk"}}
+    have = {"soy_milk": None, "egg": None, "rice": None, "onion": None}
+    r = score_ranked([rec], have, None)
+    assert r["cookable"] == 0.0 and r["cookable_subs"] == 1.0   # strict: milk+cream missing; with substitutes: none
+
+
+def test_random_inventories_use_common_ids_only():
+    import pandas as pd
+    from eval.run_retrieval import random_inventories
+    common = [f"x{i}" for i in range(25)]
+    df = pd.DataFrame({"ingredient_ids": [common + ["rare"]] * 1 + [common + ["salt"]] * 30})
+    invs = random_inventories(5, df, seed=1, min_recipes=20)
+    assert all(set(i["have"]) <= set(common) for i in invs)   # no rare id, no staple (salt)
+    assert random_inventories(5, df, seed=1, min_recipes=20) == invs      # reproducible
+
+
+def test_staples_switch(monkeypatch):
+    from core import rules
+    assert "salt" in rules.staples() and rules.staples(False) == set()
+
+
+def test_is_cookable_needs_enough_matched():
+    assert rx.is_cookable(["egg", "rice", "onion"], {"egg", "rice", "onion"}, 1, 3)
+    assert rx.is_cookable(["egg", "rice", "onion", "beef"], {"egg", "rice", "onion"}, 1, 3)
+    assert not rx.is_cookable(["egg"], set(), 1, 3)                       # 1 missing but nothing matched
+    assert not rx.is_cookable(["egg", "rice", "beef", "pork"], {"egg", "rice"}, 1, 3)
+
+
+def test_diet_check_uses_recipe_name():
+    rec = {"name": "Veal Marsala", "ingredient_ids": ["butter", "mushroom"], "ingredients": ["butter", "mushroom"]}
+    assert rx.violates_diet(rec, "vegetarian")
+
+
+def test_suits_meal():
+    assert rx.suits_meal({"name": "Chicken Stir Fry", "category": "One Dish Meal"}, "dinner")
+    assert not rx.suits_meal({"name": "Stir-Fry Sauce", "category": "Lunch/Snacks"}, "dinner")
+    assert not rx.suits_meal({"name": "Fluffy Omelet", "category": "Breakfast"}, "dinner")
+    assert rx.suits_meal({"name": "Brownies", "category": "Dessert"}, "dessert")

@@ -102,8 +102,11 @@ def storage_advice(canonical_id: str | None, location: str | None = None) -> lis
 # ---------- Shopping and restock ----------
 
 
-def staples() -> set[str]:
-    return set(load_yaml("staples").get("staples", []))
+def staples(enabled: bool | None = None) -> set[str]:
+    """Ids assumed to be in every kitchen. enabled=False (or config rules.use_staples: false) returns an
+    empty set, so nothing is assumed: used for the "no staples" ablation."""
+    on = cfg("rules", "use_staples", default=True) if enabled is None else enabled
+    return set(load_yaml("staples").get("staples", [])) if on else set()
 
 
 def shopping_list(recipe_ingredient_ids: list[str], have_ids: set[str]) -> list[str]:
