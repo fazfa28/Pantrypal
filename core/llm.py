@@ -26,7 +26,7 @@ def client(base_url: str | None = None, api_key_env: str | None = None) -> OpenA
             raise RuntimeError(
                 f"No API key: set {api_key_env} in your environment or in .streamlit/secrets.toml"
             )
-        _clients[key] = OpenAI(base_url=base_url, api_key=api_key)
+        _clients[key] = OpenAI(base_url=base_url, api_key=api_key, timeout=120)   # seconds; a hung call retries
     return _clients[key]
 
 

@@ -100,3 +100,31 @@ def test_suits_meal():
     assert not rx.suits_meal({"name": "Stir-Fry Sauce", "category": "Lunch/Snacks"}, "dinner")
     assert not rx.suits_meal({"name": "Fluffy Omelet", "category": "Breakfast"}, "dinner")
     assert rx.suits_meal({"name": "Brownies", "category": "Dessert"}, "dessert")
+
+
+def test_vegan_check_ignores_plant_based_phrases():
+    ok = {"name": "Vegan Pancakes", "ingredient_ids": [], "ingredients": ["flour", "soy milk", "peanut butter", "eggplant"]}
+    bad = {"name": "Pancakes", "ingredient_ids": [], "ingredients": ["flour", "milk", "egg"]}
+    assert not rx.violates_diet(ok, "vegan") and rx.violates_diet(bad, "vegan")
+
+
+def test_search_with_query_gates_feasibility_then_ranks_by_meaning(monkeypatch):
+    import pandas as pd
+    df = pd.DataFrame([
+        {"recipe_id": 1, "name": "Plain Rice", "minutes": 20, "category": "Rice", "servings": 2, "review_count": 9,
+         "calories_per_serving": 200, "ingredients": ["rice", "onion", "garlic"], "ingredient_ids": ["rice", "onion", "garlic"]},
+        {"recipe_id": 2, "name": "Spicy Bean Chili", "minutes": 30, "category": "Beans", "servings": 2, "review_count": 1,
+         "calories_per_serving": 300, "ingredients": ["beans", "onion", "garlic", "chili"], "ingredient_ids": ["beans", "onion", "garlic", "chili"]},
+        {"recipe_id": 3, "name": "Spicy Shrimp Curry", "minutes": 30, "category": "Curries", "servings": 2, "review_count": 1,
+         "calories_per_serving": 300, "ingredients": ["shrimp", "coconut_milk", "curry_paste", "rice"],
+         "ingredient_ids": ["shrimp", "coconut_milk", "curry_paste", "rice"]},
+    ])
+
+    class FakeEmb:
+        def similarity(self, text):
+            return {1: 0.1, 2: 0.9, 3: 0.95}   # the curry is most "spicy" but not cookable
+
+    monkeypatch.setattr(rx, "recipe_embeddings", lambda d=None: FakeEmb())
+    have = {i: None for i in ["rice", "onion", "garlic", "beans", "chili"]}
+    out = rx.search(have, top_k=3, df=df, query="something spicy", alpha=0, beta=0.05)
+    assert [r["recipe_id"] for r in out] == [2, 1, 3]   # feasible by meaning first, infeasible only as top-up

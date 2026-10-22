@@ -104,7 +104,11 @@ recommend better recipes than the usual alternatives?*
 
 ```bash
 python -m eval.make_cases                  # writes eval/cases/exp2_cases.jsonl + review CSV
+python -m eval.run_recommend --split dev   # three arms + automatic metrics
+python -m eval.judge_recommend --split dev # LLM judge (preference fit)
 ```
+
+Full design decisions, dev results and open items: [docs/experiment2_log.md](docs/experiment2_log.md).
 
 The fridge photo set and the user study are on hold.
 

@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import math
 import re
+import threading
 from functools import lru_cache
 from pathlib import Path
 
@@ -34,8 +35,14 @@ NON_VEGAN = NON_VEGETARIAN | {"dairy", "egg"}
 MEAT_WORDS = ("chicken", "beef", "pork", "bacon", "ham", "lamb", "mutton", "sausage", "turkey", "fish",
               "shrimp", "prawn", "salmon", "tuna", "anchov", "crab", "gelatin", "lard", "veal", "steak",
               "venison", "duck", "meat", "lobster", "tilapia", "cod", "scallop", "clam", "mussel", "chorizo",
-              "pepperoni", "prosciutto", "salami", "oyster")
-ANIMAL_WORDS = MEAT_WORDS + ("milk", "cheese", "butter", "cream", "yogurt", "egg", "honey")
+              "pepperoni", "prosciutto", "salami", "oyster", "worcestershire", "bouillon")
+ANIMAL_WORDS = MEAT_WORDS + ("milk", "cheese", "butter", "cream", "yogurt", "egg", "honey", "mayonnaise", "mayo")
+# Plant-based phrases removed before the word check, so "soy milk" or "peanut butter" is not flagged.
+_PLANT = re.compile(
+    r"\b(?:soy|soya|almond|oat|rice|coconut|cashew|hemp|vegan|plant[- ]based|non[- ]dairy|dairy[- ]free)"
+    r"\s+(?:milk|butter|cream|cheese|yogurt|yoghurt)s?\b"
+    r"|\b(?:peanut|almond|cashew|nut|apple|cocoa|sunflower|seed)\s+butter\b"
+    r"|\bbutternut\b|\bcream of tartar\b|\bcream of coconut\b|\beggplants?\b|\begg replacer\b")
 
 
 # Meal type of a recipe, from Food.com's RecipeCategory plus a few name words (categories are noisy).
@@ -229,9 +236,9 @@ def violates_diet(recipe: dict, diet: str | None) -> bool:
     if any(cats.get(i) in banned_cats for i in recipe["ingredient_ids"]):
         return True
     # Word-start match on the raw ingredient text AND the recipe name catches what canonicalisation missed
-    # (and ingredients the dataset dropped). Known false positives: "peanut butter", "eggplant",
-    # "cream of tartar", "hamburger buns".
-    text = (" ".join(recipe["ingredients"]) + " " + str(recipe.get("name", ""))).lower()
+    # (and ingredients the dataset dropped). Plant-based phrases are removed first (_PLANT).
+    # Known false positive left: "hamburger buns".
+    text = _PLANT.sub(" ", (" ".join(recipe["ingredients"]) + " " + str(recipe.get("name", ""))).lower())
     return any(re.search(rf"\b{w}", text) for w in words)
 
 
@@ -246,8 +253,18 @@ def search(
     df: pd.DataFrame | None = None,
     alpha: float | None = None,
     beta: float | None = None,
+    meal: str | None = None,
+    query: str | None = None,
 ) -> list[dict]:
-    """Rank recipes for an inventory. method: 'pantrypal' (match score) or 'jaccard' (baseline)."""
+    """Rank recipes for an inventory. method: 'pantrypal' (match score) or 'jaccard' (baseline).
+
+    With a `query` (the user's request in their words), PantryPal ranks in three steps:
+      1. hard filters (diet, time, meal, exclusions),
+      2. feasibility gate: keep recipes that are cookable from the inventory (is_cookable),
+      3. order those by semantic similarity to the query (MiniLM recipe embeddings);
+    if fewer than top_k pass the gate, the rest are filled by match score. Without a query, or if
+    sentence-transformers is not installed, ranking is by match score only (the original behaviour).
+    """
     df = load_index() if df is None else df
     exclude_ids = {get_canon().match(e).id or normalize(e) for e in (exclude or [])}
     scorer = jaccard_score if method == "jaccard" else (lambda ids, h: score_recipe(ids, h, alpha, beta))
@@ -256,6 +273,8 @@ def search(
         if max_minutes and rec["minutes"] > max_minutes:
             continue
         if violates_diet(rec, diet):
+            continue
+        if meal and meal != "any" and not suits_meal(rec, meal):
             continue
         if exclude_ids & set(rec["ingredient_ids"]):
             continue
@@ -268,7 +287,69 @@ def search(
         return (-round(r["score"], 3), cal_gap, -r.get("review_count", 0))
 
     results.sort(key=key)
+    if query and method == "pantrypal":
+        emb = recipe_embeddings(df)
+        if emb is not None:
+            sim = emb.similarity(query)
+            feasible = [r for r in results if is_cookable(r["ingredient_ids"], have)]
+            feasible.sort(key=lambda r: -sim.get(int(r["recipe_id"]), 0.0))
+            ids = {int(r["recipe_id"]) for r in feasible[:top_k]}
+            return feasible[:top_k] + [r for r in results if int(r["recipe_id"]) not in ids][: max(0, top_k - len(ids))]
     return results[:top_k]
+
+
+# ---------- recipe embeddings (semantic ranking; also the RAG baseline in Experiment 2) ----------
+
+
+class RecipeEmbeddings:
+    """MiniLM embeddings of 'name. category. N min. Ingredients: ...' for every recipe in the index,
+    cached next to the index file and rebuilt when the index changes."""
+
+    def __init__(self, df: pd.DataFrame):
+        import numpy as np
+        from sentence_transformers import SentenceTransformer
+
+        self.np = np
+        self.model = SentenceTransformer(cfg("canon", "embedding_model", default="all-MiniLM-L6-v2"))
+        self.lock = threading.Lock()
+        self.ids = df["recipe_id"].astype(int).to_numpy()
+        emb_file, ids_file = path("recipes").with_name("recipe_emb.npy"), path("recipes").with_name("recipe_emb_ids.npy")
+        if emb_file.exists() and ids_file.exists() and np.array_equal(np.load(ids_file), self.ids):
+            self.emb = np.load(emb_file)
+        else:
+            texts = [f"{r['name']}. {r.get('category', '')}. {r['minutes']} min. Ingredients: {', '.join(r['ingredients'])}."
+                     for r in df.to_dict("records")]
+            print(f"embedding {len(texts)} recipes (once)...")
+            self.emb = self.model.encode(texts, normalize_embeddings=True, batch_size=64)
+            np.save(emb_file, self.emb)
+            np.save(ids_file, self.ids)
+
+    def scores(self, text: str):
+        """Cosine similarity of `text` to every recipe, in index order."""
+        with self.lock:
+            q = self.model.encode([text], normalize_embeddings=True)[0]
+        return self.emb @ q
+
+    def similarity(self, text: str) -> dict[int, float]:
+        return dict(zip(self.ids.tolist(), self.scores(text).tolist()))
+
+    def top(self, text: str, k: int) -> list[int]:
+        """Row positions of the k most similar recipes."""
+        return [int(i) for i in self.np.argsort(-self.scores(text))[:k]]
+
+
+_EMB: dict[int, RecipeEmbeddings] = {}
+
+
+def recipe_embeddings(df: pd.DataFrame | None = None) -> RecipeEmbeddings | None:
+    """Shared embeddings for an index (None if sentence-transformers is not installed)."""
+    df = load_index() if df is None else df
+    if id(df) not in _EMB:
+        try:
+            _EMB[id(df)] = RecipeEmbeddings(df)
+        except ImportError:
+            return None
+    return _EMB[id(df)]
 
 
 def main():

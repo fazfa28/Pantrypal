@@ -38,12 +38,15 @@ def _fn(name: str, description: str, properties: dict | None = None, required: l
 
 TOOLS = [
     _fn("get_inventory", "List items in the fridge, freezer and pantry with days until expiry."),
-    _fn("search_recipes", "Find recipes cookable from the inventory, ranked by ingredient coverage and expiry urgency.", {
-        "max_minutes": {"type": "integer", "description": "maximum total cooking time"},
+    _fn("search_recipes", "Find recipes cookable from the inventory, ranked by relevance to the user's request. "
+        "Fill every filter: use null, \"none\", \"any\" or [] when the user did not ask for it.", {
+        "max_minutes": {"type": ["integer", "null"], "description": "time limit the user stated, else null"},
         "diet": {"type": "string", "enum": ["none", "vegetarian", "vegan"]},
-        "exclude": {"type": "array", "items": {"type": "string"}, "description": "ingredients to avoid"},
+        "meal": {"type": "string", "enum": ["any", "dinner", "breakfast", "dessert"],
+                 "description": "the meal the user named (lunch counts as dinner); dinner = a main or side dish"},
+        "exclude": {"type": "array", "items": {"type": "string"}, "description": "ingredients the user wants to avoid"},
         "top_k": {"type": "integer", "description": "number of recipes, default 5"},
-    }),
+    }, ["max_minutes", "diet", "meal", "exclude"]),
     _fn("get_recipe", "Full ingredients and steps for one recipe.",
         {"recipe_id": {"type": "integer"}}, ["recipe_id"]),
     _fn("nutrition_for", "Calories for a recipe at a number of servings, and the user's daily target.",
@@ -82,6 +85,7 @@ class Assistant:
             if name == "search_recipes":
                 hits = rx.search(
                     self.inv.have(), max_minutes=args.get("max_minutes"), diet=args.get("diet"),
+                    meal=args.get("meal"), query=getattr(self, "last_user_text", None),
                     exclude=args.get("exclude"), top_k=min(int(args.get("top_k") or 5), 10),
                     calorie_target=rules.daily_calorie_target(self.inv.profile()),
                 )
@@ -136,6 +140,7 @@ class Assistant:
     def reply(self, history: list[dict], user_text: str) -> dict:
         """history: earlier [{'role': 'user'|'assistant', 'content': str}] turns."""
         self.returned = {}
+        self.last_user_text = user_text   # search_recipes ranks feasible recipes by relevance to this
         messages = [{"role": "system", "content": SYSTEM_PROMPT.format(today=date.today().isoformat())},
                     *history, {"role": "user", "content": user_text}]
         trace, calls_left = [], cfg("llm", "max_tool_calls", default=4)
