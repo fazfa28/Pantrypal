@@ -1,6 +1,7 @@
 """Experiment 2 results: per-arm means with bootstrap 95% CIs, paired tests, judge agreement.
 
   python -m eval.exp2_stats --split test        # -> eval/results/exp2_report_<split>.md
+                                                #    + exp2_<split>_per_recipe.csv (one row per recommendation)
 
 Everything is recomputed from the saved arm outputs and judge ratings (no API calls).
 Per case, each metric is a share of the 5 slots; CIs bootstrap over cases; PantryPal is compared with
@@ -9,6 +10,7 @@ each baseline by a paired Wilcoxon signed-rank test over cases.
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import statistics
 
@@ -16,7 +18,7 @@ from core import recipes as rx
 from core.config import path
 from eval import metrics
 from eval.judge_recommend import ARMS, arm_scores, load, recipe_key
-from eval.run_recommend import auto_metrics
+from eval.run_recommend import auto_metrics, pick_checks
 
 AUTO = ("grounded", "cookable", "diet_ok", "time_ok", "exclude_ok", "use_up", "hallucinated", "filters_correct")
 JUDGED = ("fit", "sensible", "useful", "any_useful")
@@ -30,6 +32,31 @@ LABEL = {"grounded": "Grounded (real recipe)", "cookable": "Cookable@5", "diet_o
 def judge_file(name: str, split: str) -> dict:
     f = path("results") / f"exp2_judge__{name}__{split}.jsonl"
     return {r["id"]: r for r in map(json.loads, f.read_text().splitlines()) if r} if f.exists() else {}
+
+
+def export_csv(cases, runs, primary, secondary, ids, out) -> None:
+    """One row per recommended recipe: what each arm returned, the code checks and the judge scores."""
+    with open(out, "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(["case", "request", "pantry", "arm", "rank", "recipe", "recipe_id", "in_database", "minutes",
+                    "ingredients", "cookable", "diet_ok", "time_ok", "exclude_ok", "use_up_item_used",
+                    "fit_gpt", "sensible_gpt", "fit_qwen", "useful", "reason_given"])
+        for cid in ids:
+            c = cases[cid]
+            for arm in ARMS:
+                for rank, p in enumerate(runs[arm][cid]["picks"], 1):
+                    k = recipe_key(p)
+                    chk = pick_checks(c, p)
+                    g = primary[cid]["ratings"].get(k, {})
+                    q = secondary.get(cid, {}).get("ratings", {}).get(k, {})
+                    useful = all(chk.values()) and g.get("fit", 0) >= 4
+                    use_up = (c["spec"]["use_up"] in p["ingredient_ids"]) if c["spec"]["use_up"] else ""
+                    w.writerow([cid, c["request"], ", ".join(i.replace("_", " ") for i in c["pantry"]), arm, rank,
+                                p["name"], p["recipe_id"] or "", p["recipe_id"] is not None, p["minutes"],
+                                "; ".join(p["ingredients"]), chk["cookable"], chk.get("diet_ok", ""),
+                                chk.get("time_ok", ""), chk.get("exclude_ok", ""), use_up, g.get("fit", ""),
+                                g.get("sensible", ""), q.get("fit", ""), useful, p.get("reason", "")])
+    print(f"wrote {out}")
 
 
 def main():
@@ -114,6 +141,7 @@ def main():
     arm_cost = sum(runs[arm][c]["cost_usd"] or 0 for arm in ARMS for c in ids)
     lines += ["", f"Total API cost of this split: arms US${arm_cost:.3f}, judges US${judge_cost:.3f}."]
 
+    export_csv(cases, runs, primary, secondary, ids, path("results") / f"exp2_{a.split}_per_recipe.csv")
     text = "\n".join(lines)
     out = path("results") / f"exp2_report_{a.split}.md"
     out.write_text(text)
